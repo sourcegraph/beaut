@@ -16,7 +16,8 @@ func TestAbsolutePath(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, ok := NewAbsolutePath(tc.Path)
+		_, err := NewAbsolutePath(tc.Path)
+		ok := err == nil
 		if tc.expectedOk != ok {
 			t.Errorf("expected %t, got %t for path %s", tc.expectedOk, ok, tc.Path)
 		}
@@ -37,7 +38,8 @@ func TestRelativePath(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, ok := NewRelativePath(tc.Path)
+		_, err := NewRelativePath(tc.Path)
+		ok := err == nil
 		if tc.expectedOk != ok {
 			t.Errorf("expected %t, got %t for path %s", tc.expectedOk, ok, tc.Path)
 		}

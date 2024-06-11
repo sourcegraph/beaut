@@ -12,11 +12,11 @@ type AbsolutePath struct {
 	rawValue string
 }
 
-func NewAbsolutePath(rawValue string) (_ AbsolutePath, ok bool) {
+func NewAbsolutePath(rawValue string) (AbsolutePath, error) {
 	if filepath.IsAbs(rawValue) {
-		return AbsolutePath{rawValue: rawValue}, true
+		return AbsolutePath{rawValue: rawValue}, nil
 	}
-	return AbsolutePath{}, false
+	return AbsolutePath{}, NotAbsolutePathError{data: rawValue}
 }
 
 func NewAbsolutePathUnchecked(rawValue string, _ knownwf.AbsPathReason) AbsolutePath {
@@ -45,11 +45,12 @@ func (ap *AbsolutePath) UnmarshalJSON(bytes []byte) error {
 	if err := json.Unmarshal(bytes, &buf); err != nil {
 		return err
 	}
-	if p, ok := NewAbsolutePath(buf); ok {
-		*ap = p
-		return nil
+	p, err := NewAbsolutePath(buf)
+	if err != nil {
+		return err
 	}
-	return NotAbsolutePathError{Data: buf}
+	*ap = p
+	return nil
 }
 
 func (ap *AbsolutePath) Combine(other RelativePath) AbsolutePath {
@@ -65,23 +66,27 @@ func (ap *AbsolutePath) Join(others ...RelativePath) AbsolutePath {
 	return NewAbsolutePathUnchecked(filepath.Join(bs...), knownwf.AbsPathTypeInvariant)
 }
 
-type NotAbsolutePathError struct{ Data string }
+type NotAbsolutePathError struct{ data string }
 
 var _ error = NotAbsolutePathError{}
 
 func (n NotAbsolutePathError) Error() string {
-	return fmt.Sprintf("expected absolute path but got: %s", n.Data)
+	suffix := ""
+	if len(n.data) > 20 {
+		suffix = " (truncated)"
+	}
+	return fmt.Sprintf("expected absolute path but got: %+.20q%s", n.data, suffix)
 }
 
 type RelativePath struct {
 	rawValue string
 }
 
-func NewRelativePath(rawValue string) (_ RelativePath, ok bool) {
+func NewRelativePath(rawValue string) (RelativePath, error) {
 	if !filepath.IsAbs(rawValue) {
-		return RelativePath{rawValue: rawValue}, true
+		return RelativePath{rawValue: rawValue}, nil
 	}
-	return RelativePath{}, false
+	return RelativePath{}, NotRelativePathError{rawValue}
 }
 
 func NewRelativePathUnchecked(rawValue string, _ knownwf.RelPathReason) RelativePath {
@@ -110,11 +115,12 @@ func (rp *RelativePath) UnmarshalJSON(bytes []byte) error {
 	if err := json.Unmarshal(bytes, &buf); err != nil {
 		return err
 	}
-	if p, ok := NewRelativePath(buf); ok {
-		*rp = p
-		return nil
+	p, err := NewRelativePath(buf)
+	if err != nil {
+		return err
 	}
-	return NotRelativePathError{Data: buf}
+	*rp = p
+	return nil
 }
 
 func (rp *RelativePath) Combine(other RelativePath) RelativePath {
@@ -130,10 +136,14 @@ func (rp *RelativePath) Join(others ...RelativePath) RelativePath {
 	return NewRelativePathUnchecked(filepath.Join(bs...), knownwf.RelPathTypeInvariant)
 }
 
-type NotRelativePathError struct{ Data string }
+type NotRelativePathError struct{ data string }
 
 var _ error = NotRelativePathError{}
 
 func (n NotRelativePathError) Error() string {
-	return fmt.Sprintf("expected relative path but got: %s", n.Data)
+	suffix := ""
+	if len(n.data) > 20 {
+		suffix = " (truncated)"
+	}
+	return fmt.Sprintf("expected relative path but got: %+.20q%s", n.data, suffix)
 }

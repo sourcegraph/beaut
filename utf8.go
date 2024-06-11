@@ -13,11 +13,37 @@ type UTF8String struct {
 	rawValue string
 }
 
-func NewUTF8String(rawValue string) (_ UTF8String, ok bool) {
+func NewUTF8String(rawValue string) (UTF8String, error) {
 	if utf8.ValidString(rawValue) {
-		return UTF8String{rawValue: rawValue}, true
+		return UTF8String{rawValue: rawValue}, nil
 	}
-	return UTF8String{}, false
+	return UTF8String{}, NewNotWellFormedUTF8Error(rawValue)
+}
+
+type NotWellFormedUTF8Error struct {
+	// data MUST NOT be modified, since we expose a public
+	// API that does a zero-copy string->[]byte conversion
+	// and it is unsafe to modify the underlying byte slice.
+	data []byte
+}
+
+func NewNotWellFormedUTF8Error(s string) NotWellFormedUTF8Error {
+	bytes := unsafeGetUnderlyingByteSlice(s)
+	return NotWellFormedUTF8Error{bytes}
+}
+
+func NewNotWellFormedUTF8ErrorFromBytes(s []byte) NotWellFormedUTF8Error {
+	return NotWellFormedUTF8Error{s}
+}
+
+var _ error = NotWellFormedUTF8Error{}
+
+func (e NotWellFormedUTF8Error) Error() string {
+	suffix := ""
+	if len(e.data) > 50 {
+		suffix = " (truncated)"
+	}
+	return fmt.Sprintf("data is not well-formed UTF-8: %+.50q%s", e.data, suffix)
 }
 
 func NewUTF8StringUnchecked(rawValue string, _ knownwf.UTF8Reason) UTF8String {
@@ -111,11 +137,11 @@ type UTF8Bytes struct {
 	rawValue []byte
 }
 
-func NewUTF8Bytes(rawValue []byte) (_ UTF8Bytes, ok bool) {
+func NewUTF8Bytes(rawValue []byte) (_ UTF8Bytes, err error) {
 	if utf8.Valid(rawValue) {
-		return UTF8Bytes{rawValue: rawValue}, true
+		return UTF8Bytes{rawValue: rawValue}, nil
 	}
-	return UTF8Bytes{}, false
+	return UTF8Bytes{}, NotWellFormedUTF8Error{rawValue}
 }
 
 func NewUTF8BytesUnchecked(rawValue []byte, _ knownwf.UTF8Reason) UTF8Bytes {
